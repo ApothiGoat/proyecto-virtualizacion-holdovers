@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: elquetzal-db-test
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - db_test_data:/var/lib/postgresql/data
+      - ./backend/db-init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+volumes:
+  db_test_data:
