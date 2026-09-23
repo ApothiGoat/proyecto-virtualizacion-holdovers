@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS clientes (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    telefono VARCHAR(30),
+    creado_en TIMESTAMP NOT NULL DEFAULT now()
+);
