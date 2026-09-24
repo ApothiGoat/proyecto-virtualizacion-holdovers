@@ -72,3 +72,53 @@ def eliminar(sku):
             return fila
     finally:
         conn.close()
+
+
+# ------------------------------------------------------------------ categorías
+
+def listar_categorias():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, nombre FROM categorias ORDER BY nombre")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def obtener_categoria(nombre):
+    """Búsqueda sin distinguir mayúsculas. Devuelve la fila tal como está guardada."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, nombre FROM categorias WHERE lower(nombre) = lower(%s)",
+                (nombre,),
+            )
+            return cur.fetchone()
+    finally:
+        conn.close()
+
+
+def crear_categoria(nombre):
+    """Crea la categoría; si ya existe (sin distinguir mayúsculas) devuelve la existente."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO categorias (nombre) VALUES (%s) "
+                "ON CONFLICT ((lower(nombre))) DO NOTHING "
+                "RETURNING id, nombre",
+                (nombre,),
+            )
+            fila = cur.fetchone()
+            if fila is None:
+                cur.execute(
+                    "SELECT id, nombre FROM categorias WHERE lower(nombre) = lower(%s)",
+                    (nombre,),
+                )
+                fila = cur.fetchone()
+            conn.commit()
+            return fila
+    finally:
+        conn.close()

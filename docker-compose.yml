@@ -1,0 +1,252 @@
+services:
+
+  # =======================================================
+  # POSTGRESQL
+  # =======================================================
+
+  postgres:
+    image: postgres:16
+    container_name: el-quetzal-postgres
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./backend/db-init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql/data
+
+    ports:
+      - "5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # CATALOGO
+  # =======================================================
+
+  catalogo:
+    build: ./backend/catalogo
+    container_name: catalogo
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${CATALOGO_DB_NAME}
+      DB_USER: ${CATALOGO_DB_USER}
+      DB_PASSWORD: ${CATALOGO_DB_PASSWORD}
+
+    ports:
+      - "5001:5000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # INVENTARIO
+  # =======================================================
+
+  inventario:
+    build: ./backend/inventario
+    container_name: inventario
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${INVENTARIO_DB_NAME}
+      DB_USER: ${INVENTARIO_DB_USER}
+      DB_PASSWORD: ${INVENTARIO_DB_PASSWORD}
+
+    ports:
+      - "5002:5000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # CLIENTES
+  # =======================================================
+
+  clientes:
+    build: ./backend/clientes
+    container_name: clientes
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${CLIENTES_DB_NAME}
+      DB_USER: ${CLIENTES_DB_USER}
+      DB_PASSWORD: ${CLIENTES_DB_PASSWORD}
+
+    ports:
+      - "5003:5000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # PEDIDOS
+  # =======================================================
+
+  pedidos:
+    build: ./backend/pedidos
+    container_name: pedidos
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${PEDIDOS_DB_NAME}
+      DB_USER: ${PEDIDOS_DB_USER}
+      DB_PASSWORD: ${PEDIDOS_DB_PASSWORD}
+
+      CATALOGO_URL: http://catalogo:5000
+      INVENTARIO_URL: http://inventario:5000
+
+    ports:
+      - "5004:5000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalogo:
+        condition: service_started
+      inventario:
+        condition: service_started
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # REPORTES
+  # =======================================================
+
+  reportes:
+    build: ./backend/reportes
+    container_name: reportes
+    restart: unless-stopped
+
+    environment:
+      PEDIDOS_URL: http://pedidos:5000
+      CLIENTES_URL: http://clientes:5000
+
+    ports:
+      - "5005:5000"
+
+    depends_on:
+      pedidos:
+        condition: service_started
+      clientes:
+        condition: service_started
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # GATEWAY
+  # =======================================================
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+
+    container_name: gateway
+    restart: unless-stopped
+
+    ports:
+      - "8080:80"
+
+    depends_on:
+      - catalogo
+      - inventario
+      - clientes
+      - pedidos
+      - reportes
+
+    networks:
+      - el-quetzal-net
+
+
+  # =======================================================
+  # FRONTEND - DESARROLLO
+  # =======================================================
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+
+    container_name: frontend-dev
+    profiles:
+      - dev
+
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+    ports:
+      - "5173:5173"
+
+    depends_on:
+      - gateway
+
+    networks:
+      - el-quetzal-net
+
+
+# =========================================================
+# NETWORK
+# =========================================================
+
+networks:
+  el-quetzal-net:
+    driver: bridge
+
+
+# =========================================================
+# VOLUME
+# =========================================================
+
+volumes:
+  postgres_data:

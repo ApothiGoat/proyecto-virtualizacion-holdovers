@@ -99,10 +99,17 @@ def descontar_atomico(items):
     finally:
         conn.close()
 
-
 def incrementar_atomico(items):
-    """Compensación (saga): repone stock si un paso posterior (crear el pedido
-    en el microservicio 'pedidos') falla DESPUÉS de haber descontado aquí.
+    """Suma stock a varios SKUs en UNA sola transacción — todo o nada.
+
+    Se usa en dos casos:
+      1. Compensación (saga): repone stock si un paso posterior (crear el pedido
+         en el microservicio 'pedidos') falla DESPUÉS de haber descontado aquí.
+      2. Ajuste manual desde Inventario / stock inicial de un producto nuevo.
+
+    Si el SKU todavía no tiene fila de stock, la crea con esa cantidad
+    (UPSERT). Sin esto, el stock inicial de un producto nuevo se perdería en
+    silencio, porque un UPDATE sobre una fila inexistente no hace nada.
 
     Es el mecanismo que sustituye a una transacción distribuida real entre
     bases de datos separadas — se documenta como decisión de arquitectura.
@@ -110,11 +117,18 @@ def incrementar_atomico(items):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            for item in items:
+            # Mismo orden por SKU que descontar_atomico, para evitar deadlocks
+            # entre operaciones concurrentes que comparten productos.
+            for item in sorted(items, key=lambda i: i["sku"]):
                 cur.execute(
-                    "UPDATE stock SET cantidad = cantidad + %s, actualizado_en = now() "
-                    "WHERE sku = %s",
-                    (item["cantidad"], item["sku"]),
+                    """
+                    INSERT INTO stock (sku, cantidad)
+                    VALUES (%s, %s)
+                    ON CONFLICT (sku)
+                    DO UPDATE SET cantidad = stock.cantidad + EXCLUDED.cantidad,
+                                  actualizado_en = now()
+                    """,
+                    (item["sku"], item["cantidad"]),
                 )
             conn.commit()
     except Exception:

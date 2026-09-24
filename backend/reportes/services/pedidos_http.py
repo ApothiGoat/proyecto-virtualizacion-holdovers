@@ -6,6 +6,10 @@ import requests
 PEDIDOS_URL = os.environ.get("PEDIDOS_URL", "http://pedidos:5000")
 TIMEOUT = 10
 
+# Solo las ventas cerradas cuentan en los reportes: un pedido 'pendiente'
+# todavía no es venta y uno 'cancelado' nunca lo fue.
+ESTADO_VENTA = "completado"
+
 
 def listar_pedidos(desde=None, hasta=None, cliente_id=None, skus=None):
     params = {}
@@ -20,4 +24,4 @@ def listar_pedidos(desde=None, hasta=None, cliente_id=None, skus=None):
 
     resp = requests.get(f"{PEDIDOS_URL}/pedidos", params=params, timeout=TIMEOUT)
     resp.raise_for_status()
-    return resp.json()
+    return [p for p in resp.json() if p.get("estado") == ESTADO_VENTA]

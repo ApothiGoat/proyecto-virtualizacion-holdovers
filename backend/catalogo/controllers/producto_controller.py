@@ -52,3 +52,17 @@ def eliminar(sku):
         return jsonify({"mensaje": f"Producto {eliminado['sku']} eliminado"}), 200
     except KeyError as e:
         return jsonify({"error": str(e)}), 404
+
+
+def listar_categorias():
+    return jsonify(producto_service.listar_categorias()), 200
+
+
+def crear_categoria():
+    """POST /productos/categorias  body: {nombre}. Si ya existe devuelve la existente."""
+    datos = request.get_json(silent=True) or {}
+    try:
+        categoria = producto_service.crear_categoria(datos.get("nombre"))
+        return jsonify(categoria), 201
+    except ValidacionError as e:
+        return jsonify({"error": str(e)}), 400

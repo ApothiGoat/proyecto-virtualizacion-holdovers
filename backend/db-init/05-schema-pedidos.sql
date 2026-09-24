@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS pedidos (
     carne_integrante VARCHAR(30) NOT NULL,
     cliente_id INTEGER,
     total NUMERIC(10, 2) NOT NULL,
-    estado VARCHAR(20) NOT NULL DEFAULT 'confirmado',
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+        CONSTRAINT pedidos_estado_check
+        CHECK (estado IN ('pendiente', 'completado', 'cancelado')),
     fecha TIMESTAMP NOT NULL DEFAULT now()
 );
 
@@ -23,3 +25,4 @@ CREATE INDEX IF NOT EXISTS idx_pedido_items_pedido_id ON pedido_items(pedido_id)
 CREATE INDEX IF NOT EXISTS idx_pedido_items_sku       ON pedido_items(sku);
 CREATE INDEX IF NOT EXISTS idx_pedidos_fecha          ON pedidos(fecha);
 CREATE INDEX IF NOT EXISTS idx_pedidos_cliente_id     ON pedidos(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_pedidos_estado         ON pedidos(estado);
